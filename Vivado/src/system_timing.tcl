@@ -1,0 +1,1 @@
+#create_clock -period 6.734 -waveform {0.000 4.167} [get_ports TMDS_clk_p]

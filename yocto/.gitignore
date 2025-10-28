@@ -1,0 +1,10 @@
+bitbake
+build
+meta-arm
+meta-xilinx
+poky
+meta-xilinx-tools
+meta-openembedded
+*.xsa
+*.bit
+.kas_shell_history

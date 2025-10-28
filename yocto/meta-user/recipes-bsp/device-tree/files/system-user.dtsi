@@ -1,0 +1,134 @@
+/ {			
+	chosen {
+		bootargs = "earlycon console=ttyPS0,115200 clk_ignore_unused root=/dev/mmcblk0p2 rw rootwait cma=128M uio_pdrv_genirq.of_id=generic-uio cpuidle.off=1";	
+
+	};
+	
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		vdma0_buffer: vdma0_buffer@01000000 {
+			compatible = "shared-dma-pool";
+			reg = <0x01000000 0x02000000>; // 32 MB for framebuffer
+			no-map;
+		};	
+	};
+		
+        usb_phy0: phy0 {
+                compatible = "ulpi-phy";
+                #phy-cells = <0>;
+                reg = <0xe0002000 0x1000>;
+                view-port = <0x170>;
+                drv-vbus;
+        };
+};
+
+
+&gem0 {
+	local-mac-address = [00 0a 35 01 02 03];
+	phy-handle = <&ethernet_phy>;
+	ethernet_phy: ethernet-phy@1{
+		reg = <1>;
+	};
+};
+
+&i2c0 {
+    	clock-frequency = <100000>;
+    	status = "okay";
+};
+
+&usb0 {
+	status = "okay";
+        usb-phy = <&usb_phy0>;
+};
+
+&qspi {
+        compatible = "jedec,spi-nor";
+        reg = <0x0>;
+        spi-tx-bus-width = <1>;
+        spi-rx-bus-width = <4>;
+        spi-max-frequency = <100000000>;
+};
+
+&v_tpg_0 {
+	status = "okay";
+	reset-gpios = <&gpio0 54 1>;
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		port@0 {
+			reg = <0>;
+			xlnx,video-format = <0x0>;
+			xlnx,video-width = <16>;
+			tpg_out: endpoint {
+				remote-endpoint = <&vcap_in>;
+			};
+		};
+	};
+};
+
+&axi_vdma_0 {
+	memory-region = <&vdma0_buffer>; 
+	status = "okay";
+};
+
+&amba_pl {
+	digilent_hdmi {
+		compatible = "digilent,hdmi";
+		status = "okay";
+		digilent,edid-i2c = <&i2c0>;	
+		port@0 { 
+			hdmi_ep: endpoint { 
+				remote-endpoint = <&pl_disp_ep>; 
+			}; 
+		}; 
+	};
+	
+	xlnx_pl_disp {
+		compatible = "xlnx,pl-disp";
+		dmas = <&axi_vdma_0 0>; 	
+		dma-names = "dma0"; 
+		xlnx,vformat = "RG24";
+		xlnx,bridge = <&hdmi_out_top_v_tc_0>; 
+		status = "okay";
+		port@0 { 
+			pl_disp_ep: endpoint { 
+				remote-endpoint = <&hdmi_ep>; 
+			}; 
+		};
+	};
+	
+	video_cap_tpg {
+		status = "okay";
+		compatible = "xlnx,video";
+		dma-names = "port0";
+		dmas = <&axi_vdma_0 1>;
+   
+		   ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+		 
+			port@0 {
+				reg = <0>;
+				direction = "input";
+				vcap_in: endpoint {
+					remote-endpoint = <&tpg_out>;
+				};
+			};
+		};
+  	};		
+};
+
+
+
+&hdmi_out_top_v_tc_0 {
+	compatible = "xlnx,bridge-v-tc-6.1";	// 6.2 is the from the block design, but doesn't work here
+	xlnx,pixels-per-clock = <1>; 
+	status = "okay";
+};
+
+&hdmi_out_top_axi_gpio_0 {
+	compatible = "generic-uio";	
+};

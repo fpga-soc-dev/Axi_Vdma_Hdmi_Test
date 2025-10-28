@@ -1,0 +1,62 @@
+header:
+  version: 8
+
+machine: zynq-generic-7z020
+
+distro: nodistro
+
+target: image-pynq-z1
+
+repos:
+  bitbake:
+    url: "https://git.openembedded.org/bitbake"
+    tag: 2024-04.12-scarthgap
+    layers:
+      .: excluded
+
+  poky:
+    url: https://git.yoctoproject.org/poky
+    branch: scarthgap
+    layers:
+      meta:
+      meta-poky:
+
+  meta-openembedded:
+    url: http://git.openembedded.org/meta-openembedded
+    branch: scarthgap
+    layers:
+      meta-oe:
+
+  meta-xilinx:
+    url: "https://git.yoctoproject.org/meta-xilinx"
+    branch: scarthgap
+    layers:
+      meta-xilinx-core:
+      meta-xilinx-standalone:
+      meta-xilinx-bsp:
+      meta-xilinx-vendor:
+
+  meta-xilinx-tools:
+    url: "https://git.yoctoproject.org/meta-xilinx-tools"
+    branch: scarthgap
+
+  meta-arm:
+    url: "https://git.yoctoproject.org/meta-arm"
+    branch: scarthgap
+    layers:
+      meta-arm:
+      meta-arm-toolchain:
+
+  meta-user:
+    layers:
+      yocto/meta-user:
+
+local_conf_header:
+  meta-user: |
+    PACKAGECONFIG:remove:pn-gstreamer1.0-plugins-bad = " faac"
+    LICENSE_FLAGS_ACCEPTED:append = " commercial"
+    EXTRA_IMAGE_FEATURES:append = " debug-tweaks" 
+    EXTRA_IMAGE_FEATURES:append = " empty-root-password"
+    hostname:pn-base-files = "pynq-z1" 
+    DL_DIR = "${TOPDIR}/../../../../../Yocto/downloads_scarthgap"
+    SSTATE_DIR = "${TOPDIR}/../../../../../Yocto/sstate_cache_scarthgap"

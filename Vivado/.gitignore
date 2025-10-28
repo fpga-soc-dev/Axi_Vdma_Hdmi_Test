@@ -1,0 +1,10 @@
+*.jou
+*.log
+*.str
+*.xsa
+*.bit
+
+NA/
+pynq_z1/
+.Xil/
+

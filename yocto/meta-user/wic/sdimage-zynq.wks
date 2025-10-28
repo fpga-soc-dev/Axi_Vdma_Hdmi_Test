@@ -1,0 +1,2 @@
+part /boot --source bootimg-partition --use-label --fstype=vfat --label boot --active --align 4 --fixed-size 100M
+part /     --source rootfs            --use-label --fstype=ext4 --label root          --align 4 --fixed-size 2G
