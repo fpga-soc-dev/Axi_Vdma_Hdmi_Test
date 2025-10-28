@@ -374,6 +374,8 @@ proc create_root_design { parentCell } {
 
   set hdmi_out_hpd [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:gpio_rtl:1.0 hdmi_out_hpd ]
 
+  set GPIO [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:gpio_rtl:1.0 GPIO ]
+
 
   # Create ports
   set CLK_100 [ create_bd_port -dir O -type clk CLK_100 ]
@@ -931,7 +933,7 @@ proc create_root_design { parentCell } {
 
   # Create instance: xlconcat_0, and set properties
   set xlconcat_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconcat xlconcat_0 ]
-  set_property CONFIG.NUM_PORTS {5} $xlconcat_0
+  set_property CONFIG.NUM_PORTS {6} $xlconcat_0
 
 
   # Create instance: xlslice_0, and set properties
@@ -957,11 +959,11 @@ proc create_root_design { parentCell } {
   set_property -dict [list \
     CONFIG.c_m_axi_mm2s_data_width {32} \
     CONFIG.c_m_axis_mm2s_tdata_width {24} \
-    CONFIG.c_mm2s_linebuffer_depth {512} \
-    CONFIG.c_mm2s_max_burst_length {32} \
+    CONFIG.c_mm2s_linebuffer_depth {16384} \
+    CONFIG.c_mm2s_max_burst_length {128} \
     CONFIG.c_num_fstores {4} \
     CONFIG.c_s2mm_linebuffer_depth {16384} \
-    CONFIG.c_s2mm_max_burst_length {64} \
+    CONFIG.c_s2mm_max_burst_length {128} \
   ] $axi_vdma_0
 
 
@@ -973,7 +975,7 @@ proc create_root_design { parentCell } {
 
   # Create instance: axi_interconnect_0, and set properties
   set axi_interconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect axi_interconnect_0 ]
-  set_property CONFIG.NUM_MI {4} $axi_interconnect_0
+  set_property CONFIG.NUM_MI {5} $axi_interconnect_0
 
 
   # Create instance: axis_subset_converter_0, and set properties
@@ -996,25 +998,6 @@ proc create_root_design { parentCell } {
     CONFIG.S_TID_WIDTH {1} \
     CONFIG.S_TUSER_WIDTH {1} \
     CONFIG.TDATA_REMAP {tdata[23:16],tdata[7:0],tdata[15:8]} \
-  ] $axis_subset_converter_0
-
-  set_property -dict [list \
-    CONFIG.M_HAS_TKEEP.VALUE_MODE {auto} \
-    CONFIG.M_HAS_TLAST.VALUE_MODE {auto} \
-    CONFIG.M_HAS_TREADY.VALUE_MODE {auto} \
-    CONFIG.M_HAS_TSTRB.VALUE_MODE {auto} \
-    CONFIG.M_TDATA_NUM_BYTES.VALUE_MODE {auto} \
-    CONFIG.M_TDEST_WIDTH.VALUE_MODE {auto} \
-    CONFIG.M_TID_WIDTH.VALUE_MODE {auto} \
-    CONFIG.M_TUSER_WIDTH.VALUE_MODE {auto} \
-    CONFIG.S_HAS_TKEEP.VALUE_MODE {auto} \
-    CONFIG.S_HAS_TLAST.VALUE_MODE {auto} \
-    CONFIG.S_HAS_TREADY.VALUE_MODE {auto} \
-    CONFIG.S_HAS_TSTRB.VALUE_MODE {auto} \
-    CONFIG.S_TDATA_NUM_BYTES.VALUE_MODE {auto} \
-    CONFIG.S_TDEST_WIDTH.VALUE_MODE {auto} \
-    CONFIG.S_TID_WIDTH.VALUE_MODE {auto} \
-    CONFIG.S_TUSER_WIDTH.VALUE_MODE {auto} \
   ] $axis_subset_converter_0
 
 
@@ -1040,31 +1023,24 @@ proc create_root_design { parentCell } {
     CONFIG.TDATA_REMAP {tdata[23:16],tdata[7:0],tdata[15:8]} \
   ] $axis_subset_converter_1
 
+
+  # Create instance: axi_gpio_0, and set properties
+  set axi_gpio_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_gpio axi_gpio_0 ]
   set_property -dict [list \
-    CONFIG.M_HAS_TKEEP.VALUE_MODE {auto} \
-    CONFIG.M_HAS_TLAST.VALUE_MODE {auto} \
-    CONFIG.M_HAS_TREADY.VALUE_MODE {auto} \
-    CONFIG.M_HAS_TSTRB.VALUE_MODE {auto} \
-    CONFIG.M_TDATA_NUM_BYTES.VALUE_MODE {auto} \
-    CONFIG.M_TDEST_WIDTH.VALUE_MODE {auto} \
-    CONFIG.M_TID_WIDTH.VALUE_MODE {auto} \
-    CONFIG.M_TUSER_WIDTH.VALUE_MODE {auto} \
-    CONFIG.S_HAS_TKEEP.VALUE_MODE {auto} \
-    CONFIG.S_HAS_TLAST.VALUE_MODE {auto} \
-    CONFIG.S_HAS_TREADY.VALUE_MODE {auto} \
-    CONFIG.S_HAS_TSTRB.VALUE_MODE {auto} \
-    CONFIG.S_TDATA_NUM_BYTES.VALUE_MODE {auto} \
-    CONFIG.S_TDEST_WIDTH.VALUE_MODE {auto} \
-    CONFIG.S_TID_WIDTH.VALUE_MODE {auto} \
-    CONFIG.S_TUSER_WIDTH.VALUE_MODE {auto} \
-  ] $axis_subset_converter_1
+    CONFIG.C_ALL_INPUTS {1} \
+    CONFIG.C_GPIO_WIDTH {6} \
+    CONFIG.C_INTERRUPT_PRESENT {1} \
+    CONFIG.C_IS_DUAL {0} \
+  ] $axi_gpio_0
 
 
   # Create interface connections
+  connect_bd_intf_net -intf_net axi_gpio_0_GPIO [get_bd_intf_ports GPIO] [get_bd_intf_pins axi_gpio_0/GPIO]
   connect_bd_intf_net -intf_net axi_interconnect_0_M00_AXI [get_bd_intf_pins axi_interconnect_0/M00_AXI] [get_bd_intf_pins v_tpg_0/s_axi_CTRL]
   connect_bd_intf_net -intf_net axi_interconnect_0_M01_AXI [get_bd_intf_pins axi_interconnect_0/M01_AXI] [get_bd_intf_pins axi_vdma_0/S_AXI_LITE]
   connect_bd_intf_net -intf_net axi_interconnect_0_M02_AXI [get_bd_intf_pins axi_interconnect_0/M02_AXI] [get_bd_intf_pins hdmi_out_top/ctrl]
   connect_bd_intf_net -intf_net axi_interconnect_0_M03_AXI [get_bd_intf_pins axi_interconnect_0/M03_AXI] [get_bd_intf_pins hdmi_out_top/S_AXI]
+  connect_bd_intf_net -intf_net axi_interconnect_0_M04_AXI [get_bd_intf_pins axi_interconnect_0/M04_AXI] [get_bd_intf_pins axi_gpio_0/S_AXI]
   connect_bd_intf_net -intf_net axi_vdma_0_M_AXIS_MM2S [get_bd_intf_pins axi_vdma_0/M_AXIS_MM2S] [get_bd_intf_pins axis_subset_converter_1/S_AXIS]
   connect_bd_intf_net -intf_net axi_vdma_0_M_AXI_MM2S [get_bd_intf_pins axi_vdma_0/M_AXI_MM2S] [get_bd_intf_pins smartconnect_0/S00_AXI]
   connect_bd_intf_net -intf_net axi_vdma_0_M_AXI_S2MM [get_bd_intf_pins axi_vdma_0/M_AXI_S2MM] [get_bd_intf_pins smartconnect_0/S01_AXI]
@@ -1079,6 +1055,8 @@ proc create_root_design { parentCell } {
   connect_bd_intf_net -intf_net v_tpg_0_m_axis_video [get_bd_intf_pins v_tpg_0/m_axis_video] [get_bd_intf_pins axis_subset_converter_0/S_AXIS]
 
   # Create port connections
+  connect_bd_net -net axi_gpio_0_ip2intc_irpt  [get_bd_pins axi_gpio_0/ip2intc_irpt] \
+  [get_bd_pins xlconcat_0/In5]
   connect_bd_net -net axi_vdma_0_mm2s_introut  [get_bd_pins axi_vdma_0/mm2s_introut] \
   [get_bd_pins xlconcat_0/In0]
   connect_bd_net -net axi_vdma_0_s2mm_introut  [get_bd_pins axi_vdma_0/s2mm_introut] \
@@ -1102,7 +1080,9 @@ proc create_root_design { parentCell } {
   [get_bd_pins axi_interconnect_0/S00_ACLK] \
   [get_bd_pins axi_interconnect_0/M01_ACLK] \
   [get_bd_pins axi_interconnect_0/M02_ACLK] \
-  [get_bd_pins axi_interconnect_0/M03_ACLK]
+  [get_bd_pins axi_interconnect_0/M03_ACLK] \
+  [get_bd_pins axi_gpio_0/s_axi_aclk] \
+  [get_bd_pins axi_interconnect_0/M04_ACLK]
   connect_bd_net -net ps7_0_FCLK_CLK1  [get_bd_pins ps7_0/FCLK_CLK1] \
   [get_bd_ports CLK_100] \
   [get_bd_pins ps7_0/S_AXI_HP0_ACLK] \
@@ -1138,7 +1118,9 @@ proc create_root_design { parentCell } {
   [get_bd_pins axi_interconnect_0/S00_ARESETN] \
   [get_bd_pins axi_interconnect_0/M01_ARESETN] \
   [get_bd_pins axi_interconnect_0/M02_ARESETN] \
-  [get_bd_pins axi_interconnect_0/M03_ARESETN]
+  [get_bd_pins axi_interconnect_0/M03_ARESETN] \
+  [get_bd_pins axi_gpio_0/s_axi_aresetn] \
+  [get_bd_pins axi_interconnect_0/M04_ARESETN]
   connect_bd_net -net rst_ps7_0_fclk0_peripheral_aresetn  [get_bd_pins rst_ps7_0_fclk0/peripheral_aresetn] \
   [get_bd_pins hdmi_out_top/aresetn]
   connect_bd_net -net rst_ps7_0_fclk1_interconnect_aresetn  [get_bd_pins rst_ps7_0_fclk1/interconnect_aresetn] \
@@ -1158,6 +1140,7 @@ proc create_root_design { parentCell } {
 
   # Create address segments
   assign_bd_address -offset 0x41200000 -range 0x00010000 -target_address_space [get_bd_addr_spaces ps7_0/Data] [get_bd_addr_segs hdmi_out_top/axi_gpio_0/S_AXI/Reg] -force
+  assign_bd_address -offset 0x41210000 -range 0x00010000 -with_name SEG_axi_gpio_0_Reg_1 -target_address_space [get_bd_addr_spaces ps7_0/Data] [get_bd_addr_segs axi_gpio_0/S_AXI/Reg] -force
   assign_bd_address -offset 0x43000000 -range 0x00010000 -target_address_space [get_bd_addr_spaces ps7_0/Data] [get_bd_addr_segs axi_vdma_0/S_AXI_LITE/Reg] -force
   assign_bd_address -offset 0x43C10000 -range 0x00010000 -target_address_space [get_bd_addr_spaces ps7_0/Data] [get_bd_addr_segs hdmi_out_top/v_tc_0/ctrl/Reg] -force
   assign_bd_address -offset 0x43C00000 -range 0x00010000 -target_address_space [get_bd_addr_spaces ps7_0/Data] [get_bd_addr_segs v_tpg_0/s_axi_CTRL/Reg] -force

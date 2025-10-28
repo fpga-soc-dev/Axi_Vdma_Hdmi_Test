@@ -22,26 +22,12 @@ constexpr uint32_t BUTTON2_PIN = 3; // GPIO pin for Button 2
 constexpr uint32_t BUTTON3_PIN = 4; // GPIO pin for Button 3
 constexpr uint32_t BUTTON4_PIN = 5; // GPIO pin for Button 4
 
-constexpr int WIDTH = 1280;
-constexpr int HEIGHT = 720;
-constexpr int FRAMERATE = 30;
-constexpr std::string PC_IP_ADDRESS = "192.168.1.20";
-constexpr int PORT = 5004;
-
 std::unique_ptr<Tpg::TpgDriver> g_tpg = nullptr;
 
 std::mutex g_status_mutex;
 std::condition_variable g_status_cv;
 std::atomic<bool> g_status_update_requested{false};
 std::atomic<bool> g_should_exit{false};
-
-struct AppConfig
-{
-    int width = WIDTH;
-    int height = HEIGHT;
-    std::string ip_address = PC_IP_ADDRESS;
-    int port = PORT;
-};
 
 void TriggerStatusUpdate()
 {
@@ -185,18 +171,30 @@ void PrintUsage(const char *program_name)
 {
     std::cout << "Usage: " << program_name << " [options]\n"
               << "Options:\n"
-              << "  -w, --width <width>      Video width (default: " << WIDTH << ")\n"
-              << "  -h, --height <height>    Video height (default: " << HEIGHT << ")\n"
-              << "  -i, --ip <ip_address>    Target IP address (default: " << PC_IP_ADDRESS << ")\n"
-              << "  -p, --port <port>        Target port (default: " << PORT << ")\n"
+              << "  -w, --width <width>\n"
+              << "  -h, --height <height>\n"
+              << "  -f, --framerate <framerate>\n"
               << "  --help                   Show this help message\n"
               << "\nExample:\n"
-              << "  " << program_name << " -w 640 -h 480 -i 192.168.1.100 -p 5005\n";
+              << "  " << program_name << " -w 640 -h 480 -f 30\n";
 }
+
+struct AppConfig
+{
+    int width;
+    int height;
+    int framerate;
+};
 
 AppConfig ParseArguments(int argc, char *argv[])
 {
     AppConfig config;
+
+    if (argc == 1)
+    {
+        PrintUsage(argv[0]);
+        exit(1);
+    }
 
     for (int i = 1; i < argc; i++)
     {
@@ -215,13 +213,9 @@ AppConfig ParseArguments(int argc, char *argv[])
         {
             config.height = std::stoi(argv[++i]);
         }
-        else if ((arg == "-i" || arg == "--ip") && i + 1 < argc)
+        else if ((arg == "-f" || arg == "--framerate") && i + 1 < argc)
         {
-            config.ip_address = argv[++i];
-        }
-        else if ((arg == "-p" || arg == "--port") && i + 1 < argc)
-        {
-            config.port = std::stoi(argv[++i]);
+            config.framerate = std::stoi(argv[++i]);
         }
         else
         {
@@ -246,7 +240,6 @@ int main(int argc, char *argv[])
 
     try
     {
-        // Initialize TPG
         Tpg::TpgConfig config;
         config.format = Tpg::PixelFormat::RBG888;
         config.pattern = Tpg::TestPattern::COLOR_BARS;
@@ -287,11 +280,19 @@ int main(int argc, char *argv[])
         gpio.EnableInterrupt(BUTTON3_PIN, buttonConfig);
         gpio.EnableInterrupt(BUTTON4_PIN, buttonConfig);
 
+        SPDLOG_INFO("SW1 : Increase Motion Speed");
+        SPDLOG_INFO("SW2 : Decrease Motion Speed");
+        SPDLOG_INFO("BTN1: Cycle Background Pattern");
+        SPDLOG_INFO("BTN2: Cycle Foreground Pattern");
+        SPDLOG_INFO("BTN3: Increase Box Size");
+        SPDLOG_INFO("BTN4: Decrease Box Size");
+        SPDLOG_INFO("Press Ctrl+C to exit.");
+
         std::string capture_pipeline =
             "v4l2src device=/dev/video0 io-mode=dmabuf ! "
             "video/x-raw,format=BGR,width=" +
             std::to_string(config.width) +
-            ",height=" + std::to_string(config.height) + ",framerate=" + std::to_string(FRAMERATE) + "/1 ! appsink";
+            ",height=" + std::to_string(config.height) + ",framerate=" + std::to_string(app_config.framerate) + "/1 ! appsink";
 
         cv::VideoCapture cap(capture_pipeline, cv::CAP_GSTREAMER);
 
@@ -302,33 +303,27 @@ int main(int argc, char *argv[])
         }
 
         std::string writer_pipeline =
-            "appsrc format=time do-timestamp=true "
-            "caps=video/x-raw,format=BGR,width=" +
+            "appsrc caps=video/x-raw,format=BGR,width=" +
             std::to_string(config.width) +
-            ",height=" + std::to_string(config.height) + ",framerate=" + std::to_string(FRAMERATE) + "/1 ! "
-                                                                                                     "queue ! videoconvert ! video/x-raw,format=I420 ! "
-                                                                                                     "jpegenc quality=90 ! rtpjpegpay pt=26 ! "
-                                                                                                     "udpsink host=" +
-            app_config.ip_address + " port=" + std::to_string(app_config.port) + " sync=true";
+            ",height=" + std::to_string(config.height) + ",framerate=" + std::to_string(app_config.framerate) + "/1 ! "
+                                                                                                                "fbdevsink device=/dev/fb0 sync=false";
 
-        cv::VideoWriter udp_writer(writer_pipeline, cv::CAP_GSTREAMER, 0, FRAMERATE, cv::Size(config.width, config.height), true);
+        cv::VideoWriter fb_writer(writer_pipeline, cv::CAP_GSTREAMER, 0, app_config.framerate, cv::Size(config.width, config.height), true);
 
-        if (!udp_writer.isOpened())
+        if (!fb_writer.isOpened())
         {
-            SPDLOG_ERROR("Could not open UDP writer pipeline.");
+            SPDLOG_ERROR("Could not open FB writer pipeline.");
             return -1;
         }
 
-        SPDLOG_INFO("SW1 : Increase Motion Speed");
-        SPDLOG_INFO("SW2 : Decrease Motion Speed");
-        SPDLOG_INFO("BTN1: Cycle Background Pattern");
-        SPDLOG_INFO("BTN2: Cycle Foreground Pattern");
-        SPDLOG_INFO("BTN3: Increase Box Size");
-        SPDLOG_INFO("BTN4: Decrease Box Size");
-        SPDLOG_INFO("Press Ctrl+C to exit.");
-
         cv::Mat frame;
         int frame_count{0};
+
+        auto fps_start_time = std::chrono::steady_clock::now();
+        auto last_fps_time = fps_start_time;
+        double current_fps = 0.0;
+        int fps_frame_count = 0;
+        constexpr int FPS_UPDATE_INTERVAL = 30;
 
         while (!g_should_exit.load())
         {
@@ -340,10 +335,19 @@ int main(int argc, char *argv[])
                 break;
             }
 
-            if (frame.empty())
+            fps_frame_count++;
+            if (fps_frame_count >= FPS_UPDATE_INTERVAL)
             {
-                SPDLOG_DEBUG("cap.read() returned an empty frame. Loop is breaking.");
-                break;
+                auto current_time = std::chrono::steady_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_fps_time);
+
+                if (duration.count() > 0)
+                {
+                    current_fps = (fps_frame_count * 1000.0) / duration.count();
+                }
+
+                last_fps_time = current_time;
+                fps_frame_count = 0;
             }
 
             auto now = std::chrono::system_clock::now();
@@ -371,47 +375,46 @@ int main(int argc, char *argv[])
 
             info_text = "Resolution: " + std::to_string(width) + "x" + std::to_string(height);
             cv::putText(frame, info_text, cv::Point(10, y_offset),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 255), 2);
+                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 2);
             y_offset += line_height;
 
             info_text = "BG Pattern: " + std::to_string(static_cast<uint32_t>(pattern));
             cv::putText(frame, info_text, cv::Point(10, y_offset),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 255), 2);
+                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 2);
             y_offset += line_height;
 
             info_text = "FG Pattern: " + std::to_string(fg_pattern);
             cv::putText(frame, info_text, cv::Point(10, y_offset),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 255), 2);
+                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 2);
             y_offset += line_height;
 
             info_text = "Speed: " + std::to_string(speed);
             cv::putText(frame, info_text, cv::Point(10, y_offset),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 255), 2);
+                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 2);
             y_offset += line_height;
 
             info_text = "Box Size: " + std::to_string(box_size);
             cv::putText(frame, info_text, cv::Point(10, y_offset),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 255), 2);
-
-            y_offset += line_height;
-            info_text = "Streaming to: " + app_config.ip_address + ":" + std::to_string(app_config.port);
-            cv::putText(frame, info_text, cv::Point(10, y_offset),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 255), 2);
+                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 2);
 
             y_offset += line_height;
             info_text = "Type: " + std::to_string(frame.type()) + " Channel: " + std::to_string(frame.channels()) +
                         " Depth: " + std::to_string(frame.depth());
             cv::putText(frame, info_text, cv::Point(10, y_offset),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 255), 2);
+                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 2);
 
-            // cv::cvtColor(frame, frame, cv::COLOR_BGR2RGB);
+            y_offset += line_height;
+            info_text = "FPS: " + std::to_string(current_fps).substr(0, 5);
+            cv::putText(frame, info_text, cv::Point(10, y_offset),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 2);
 
-            udp_writer.write(frame);
+            fb_writer.write(frame);
+
             frame_count++;
         }
 
-        udp_writer.release();
         cap.release();
+        fb_writer.release();
 
         gpio.DisableAllInterrupts();
     }

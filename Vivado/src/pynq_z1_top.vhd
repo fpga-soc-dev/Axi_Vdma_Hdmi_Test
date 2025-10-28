@@ -110,6 +110,8 @@ architecture rtl of pynq_z1_top is
       hdmi_out_ddc_sda_t : out STD_LOGIC;
       hdmi_out_hpd_tri_i : in std_logic_vector ( 0 downto 0 );
       
+      GPIO_tri_i         : in std_logic_vector(5 downto 0);
+      
       LED2               : out std_logic;
       LED3               : out std_logic;
       LED4               : out std_logic
@@ -132,6 +134,7 @@ architecture rtl of pynq_z1_top is
   signal hdmi_out_ddc_sda_t : std_logic;
   
   signal hdmi_hpd_sig       : std_logic_vector ( 0 downto 0 );
+  signal gpio_in_signals : std_logic_vector(5 downto 0);
     
 
   ----------------------------------------------------------------------------------------------------
@@ -185,10 +188,18 @@ begin
       
       LED2                      => LED2,
       LED3                      => LED3,
-      LED4                      => LED4       
+      LED4                      => LED4,
+      
+      GPIO_tri_i                => gpio_in_signals       
     );
     
     hdmi_hpd_sig(0) <= HDMI_HPD;
+    gpio_in_signals(0) <= SWITCH1;
+    gpio_in_signals(1) <= SWITCH2;
+    gpio_in_signals(2) <= BUTTON1;
+    gpio_in_signals(3) <= BUTTON2;
+    gpio_in_signals(4) <= BUTTON3;
+    gpio_in_signals(5) <= BUTTON4;
     
     DDC_scl_iobuf: component IOBUF
     port map (
