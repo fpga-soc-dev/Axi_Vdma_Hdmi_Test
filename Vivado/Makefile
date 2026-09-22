@@ -1,4 +1,5 @@
 board_name := pynq_z1
+overlay_name := pynq_z1
 
 all: create_project bitstream check_timing clean_logs
 	@echo
